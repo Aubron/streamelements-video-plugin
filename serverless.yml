@@ -1,0 +1,103 @@
+service: streamelements-video
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  websocketsApiName: streamelements-video
+  websocketsApiRouteSelectionExpression: $request.body.action # custom routes are selected by the value of the action property in the body
+  region: us-east-2
+  iamRoleStatements:
+  - Effect: Allow
+    Action:
+      - "execute-api:ManageConnections"
+      - "execute-api:Invoke"
+    Resource:
+      - "arn:aws:execute-api:*:*:**/@connections/*"
+  - Effect: Allow
+    Action:
+      - "dynamodb:PutItem"
+      - "dynamodb:GetItem"
+      - "dynamodb:UpdateItem"
+      - "dynamodb:DeleteItem"
+      - "dynamodb:BatchGetItem"
+      - "dynamodb:BatchWriteItem"
+      - "dynamodb:Query"
+      - "dynamodb:Scan"
+    Resource:
+      - Fn::GetAtt: [connectionsTable, Arn]
+      - Fn::Join:
+          - '/'
+          - - Fn::GetAtt: [connectionsTable, Arn]
+            - '*'
+  environment:
+    APPLICATION_TABLE:
+      Ref: connectionsTable
+    API_REGION: "${self:provider.region}"
+    VIDEO_BUCKET:
+      Ref: videoBucket
+    GW_URL:
+      Fn::Join:
+        - ""
+        - - "https://"
+          - Ref: "WebsocketsApi"
+          - ".execute-api.${self:custom.region}.amazonaws.com/${self:custom.stage}"
+custom:
+  stage: dev
+  region: us-east-2
+
+functions:
+  connectionHandler:
+    handler: src/handler.connectionHandler
+    events:
+      - websocket:
+          route: $connect
+      - websocket:
+          route: $disconnect
+  videoHandler:
+    handler: src/handler.videoHandler
+    events:
+      - http:
+          path: addVideo
+          method: post
+          cors: true
+      - websocket:
+          route: video # will trigger if $request.body.action === "foo"
+resources: # CloudFormation template syntax from here on.
+  Resources:
+    connectionsTable: 
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: connectionsTable
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+    videoBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        # Set the CORS policy
+        CorsConfiguration:
+          CorsRules:
+            -
+              AllowedOrigins:
+                - '*'
+              AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+                - DELETE
+                - HEAD
+              MaxAge: 3000
+
+
+Outputs:
+  AttachmentsBucketName:
+    Value:
+      Ref: AttachmentsBucket
