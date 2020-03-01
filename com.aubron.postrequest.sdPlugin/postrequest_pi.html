@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>com.elgato.numberdisplay PI</title>
+    <link rel="stylesheet" href="sdpi.css">
+    <script src="common.js"></script>
+</head>
+
+<body>
+    <div class="sdpi-wrapper">
+        <div type="field" class="sdpi-item">
+            <div class="sdpi-item-label">URL</div>
+            <input class="sdpi-item-value"  id="setValueUrl" type="text" onblur="sendValueToPlugin(event.target.value, 'setValue')">
+        </div>
+        <div type="field" class="sdpi-item">
+            <div class="sdpi-item-label">Video Filename</div>
+            <input class="sdpi-item-value"  id="setFilename" type="text" onblur="sendValueToPlugin(event.target.value, 'setValue')">
+        </div>
+    </div>
+
+    <script>
+        var pluginAction = null,
+            uuid = '',
+            urlValueInput = document.getElementById('setValueUrl'),
+            filenameInput = document.getElementById('setFilename')
+
+        if ($SD) {
+            $SD.on('connected', function (jsonObj) {
+                uuid = jsonObj['uuid'];
+                if (jsonObj.hasOwnProperty('actionInfo')) {
+                    pluginAction = jsonObj.actionInfo['action'];
+                    var settings = jsonObj.actionInfo.payload.settings
+                    filenameInput.value = settings.filename
+                    urlValueInput.value = settings.url
+                }
+            });
+        };
+
+        /** you can also use ES6 syntax like so:
+        *
+        *   if ($SD) $SD.on('connected', (jsonObj) => { uuid=jsonObj.uuid }));
+        *    
+        */
+
+        function sendValueToPlugin(value, param) {
+
+            // console.log("SENDING VALUE TO PLUGIN: ", value, uuid, pluginAction);
+            if (param === 'setValue') {
+                value = {
+                    url: urlValueInput.value,
+                    filename: filenameInput.value
+                }
+                /*
+                aValueSlider && Array.prototype.forEach.call(aValueSlider, function (ctl) {
+                    ctl.value = value;
+                })
+
+                oValueSelector && Array.prototype.forEach.call(oValueSelector.options, function (o) {
+                    const val = Math.round(value);
+                    if (o.value !== val) {
+                        oValueSelector.value = val;
+                    }
+                })
+                */
+            }
+            console.log('sending new settings',value);
+
+            if ($SD && $SD.connection) {
+                var payload = {};
+                if (param) {
+                    payload[param] = value;
+                }
+                $SD.api.sendToPlugin(uuid, pluginAction, payload);
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>
