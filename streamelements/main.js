@@ -17,3 +17,4 @@ socket.onmessage = (event) => {
 video.onended = () => {
     video.src = null;
 }
+keepAlive();
